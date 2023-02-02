@@ -1,0 +1,13 @@
+access_log:
+  stored_proc: getsomething
+  key1:
+    qwe: some->bread->crumb
+    aa: something else here
+    b: qqqq
+  uses:
+      qwe: asd
+reporting:
+  stored_proc: reportingsp
+  uses:
+      price: 10 #123
+      cost: 200
