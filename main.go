@@ -1,46 +1,50 @@
 package main
 
 import (
-	"bytes"
-	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 )
 
+
 func main() {
-	var f1, f2 map[string]interface{}
-	var b bytes.Buffer
-	b1, err := ioutil.ReadFile(os.Args[1])
-	b2, err := ioutil.ReadFile(os.Args[2])
-	if err != nil {
-		log.Fatal(err)
+	var index int
+	newLines := map[int]string{}
+	for {
+		file1, err := ioutil.ReadFile(os.Args[1])
+		file2, err := ioutil.ReadFile(os.Args[2])
+		if err != nil {
+			log.Fatalln(err)
+		}
+		lines1 := strings.Split(string(file1), "\n")
+		lines2 := strings.Split(string(file2), "\n")
+		index = changeSecondFile(lines1,lines2,index)
+		if len(lines1) == len(lines2) {
+			break
+		}
+		newLines[index - 1] = lines1[index - 1]
 	}
-	yaml.Unmarshal(b1, &f1)
-	yaml.Unmarshal(b2, &f2)
-	compareMaps(f1, f2, "price")
-	yamlEncoder := yaml.NewEncoder(&b)
-	yamlEncoder.SetIndent(2)
-	yamlEncoder.Encode(&f2)
-	yaml.Marshal(&f2)
-	os.WriteFile("config3.yml", b.Bytes(), 0666)
+
+	for k,v := range newLines {
+
+	}
+
 
 }
 
-func compareMaps(m1, m2 map[string]interface{}, fk string) {
-	for k, v := range m1 {
-		if keyExist(m2, k) {
-			switch t := v.(type) {
-			case map[string]interface{}:
-				compareMaps(t, m2[k].(map[string]interface{}), fk)
-			}
-		} else {
-			m2[k] = v
+func changeSecondFile(lines1,lines2 []string, lineIndex int) int {
+		for i := lineIndex; i < len(lines2); i++ {
+		if lines2[i] != lines1[i] {
+			lines2[i] = "empty line\n" + lines2[i]
+			lineIndex = i + 1
+			break
 		}
 	}
-}
-
-func keyExist(m1 map[string]interface{}, key string) bool {
-	_, ok := m1[key]
-	return ok
+	output := strings.Join(lines2, "\n")
+	err := ioutil.WriteFile(os.Args[2], []byte(output), 0644)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	return lineIndex
 }
