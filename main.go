@@ -4,47 +4,125 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 )
 
-
 func main() {
-	var index int
-	newLines := map[int]string{}
-	for {
-		file1, err := ioutil.ReadFile(os.Args[1])
-		file2, err := ioutil.ReadFile(os.Args[2])
-		if err != nil {
-			log.Fatalln(err)
+	var woDeleted []string
+	file1 := readFile(os.Args[1])
+	file2 := readFile(os.Args[2])
+	file3 := readFile(os.Args[3])
+	lines1 := strings.Split(string(file1), "\n")
+	lines2 := strings.Split(string(file2), "\n")
+	lines3 := strings.Split(string(file3), "\n")
+	removeComments(lines1, lines2)
+	m1, m2 := getChangedLines(lines1, lines2)
+	deletedKeys := sortMaps(m2, m1)
+	for index, v := range lines3 {
+		if _, ok := deletedKeys[getPathForLine(lines3, uint(index))]; !ok {
+			woDeleted = append(woDeleted, v)
 		}
-		lines1 := strings.Split(string(file1), "\n")
-		lines2 := strings.Split(string(file2), "\n")
-		index = changeSecondFile(lines1,lines2,index)
-		if len(lines1) == len(lines2) {
-			break
+	}
+	os.WriteFile(os.Args[3], []byte(strings.Join(woDeleted, "\n")), 0644)
+	file3 = readFile(os.Args[3])
+	lines3 = strings.Split(string(file3), "\n")
+	newKeys := sortMaps(m1, m2)
+	for k, v := range newKeys {
+		keys := strings.Split(k, ".")
+		if strings.Count(k, ".") < 2 {
+			for i, line := range lines1 {
+				if strings.Contains(getPathForLine(lines1, uint(i)), k) {
+					lines3[len(lines3)-1] += "\n" + line
+				}
+			}
 		}
-		newLines[index - 1] = lines1[index - 1]
+		keys = keys[:len(keys)-1]
+		keyPath := strings.Join(keys, ".")
+		for k3, v3 := range lines3 {
+			path := getPathForLine(lines3, uint(k3))
+			if path == keyPath {
+				for _, val := range v {
+					lines3[k3] = v3 + "\n" + val
+				}
+			}
+		}
+		//log.Printf("Ключ %s был добавлен", k)
 	}
-
-	for k,v := range newLines {
-
-	}
-
-
+	os.WriteFile(os.Args[3], []byte(strings.Join(lines3, "\n")), 0644)
 }
 
-func changeSecondFile(lines1,lines2 []string, lineIndex int) int {
-		for i := lineIndex; i < len(lines2); i++ {
-		if lines2[i] != lines1[i] {
-			lines2[i] = "empty line\n" + lines2[i]
-			lineIndex = i + 1
+func sortMaps(m1, m2 map[string][]string) map[string][]string {
+	resultMap := map[string][]string{}
+	for k, v := range m1 {
+		if _, ok := m2[k]; !ok {
+			resultMap[k] = append(resultMap[k], v...)
+		}
+	}
+	return resultMap
+}
+
+func getChangedLines(lines1, lines2 []string) (map[string][]string, map[string][]string) {
+	m1 := map[string][]string{}
+	m2 := map[string][]string{}
+	for k, v := range lines1 {
+		path := getPathForLine(lines1, uint(k))
+		m1[path] = append(m1[path], v)
+	}
+	for k, v := range lines2 {
+		path := getPathForLine(lines2, uint(k))
+		m2[path] = append(m2[path], v)
+	}
+	return m1, m2
+}
+
+func getPathForLine(lines []string, index uint) string {
+	var pathArr []string
+	var path string
+	curIndent := getIndent(lines[index])
+	for i := index; i > 0; i-- {
+		if getIndent(lines[i]) == 0 {
+			break
+		} else if getIndent(lines[i-1]) < getIndent(lines[i]) && getIndent(lines[i]) <= curIndent {
+			pathArr = append(pathArr, getKey(lines[i-1]))
+			curIndent = getIndent(lines[i-1])
+		}
+	}
+	for i := len(pathArr) - 1; i >= 0; i-- {
+		path = path + "." + pathArr[i]
+	}
+	return path + "." + getKey(lines[index])
+}
+
+func getIndent(line string) int {
+	var indent int
+	for _, b := range []byte(line) {
+		if b == 32 {
+			indent++
+		} else {
 			break
 		}
 	}
-	output := strings.Join(lines2, "\n")
-	err := ioutil.WriteFile(os.Args[2], []byte(output), 0644)
-	if err != nil {
-		log.Fatalln(err)
+	return indent
+}
+
+func getKey(line string) string {
+	return strings.TrimSpace(strings.Split(line, ":")[0])
+}
+
+func removeComments(arrs ...[]string) {
+	re := regexp.MustCompile(`\#.*$`)
+	for _, arr := range arrs {
+		for k, v := range arr {
+			arr[k] = re.ReplaceAllString(v, "")
+		}
 	}
-	return lineIndex
+}
+
+func readFile(filename string) []byte {
+	f1, err := ioutil.ReadFile(filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return f1
 }
