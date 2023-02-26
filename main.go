@@ -20,7 +20,8 @@ func main() {
 	m1, m2 := getChangedLines(lines1, lines2)
 	deletedKeys := sortMaps(m2, m1)
 	for index, v := range lines3 {
-		if _, ok := deletedKeys[getPathForLine(lines3, uint(index))]; !ok {
+		path := getPathForLine(lines3, uint(index))
+		if _, ok := deletedKeys[path]; !ok {
 			woDeleted = append(woDeleted, v)
 		}
 	}
@@ -40,14 +41,19 @@ func main() {
 		keys = keys[:len(keys)-1]
 		keyPath := strings.Join(keys, ".")
 		for k3, v3 := range lines3 {
+			var newLine string
 			path := getPathForLine(lines3, uint(k3))
 			if path == keyPath {
-				for _, val := range v {
-					lines3[k3] = v3 + "\n" + val
+				for index, val := range v {
+					if index == 0 {
+						newLine += val
+					} else {
+						newLine += "\n" + val
+					}
 				}
+				lines3[k3] = v3 + "\n" + newLine
 			}
 		}
-		//log.Printf("Ключ %s был добавлен", k)
 	}
 	os.WriteFile(os.Args[3], []byte(strings.Join(lines3, "\n")), 0644)
 }
@@ -68,10 +74,24 @@ func getChangedLines(lines1, lines2 []string) (map[string][]string, map[string][
 	for k, v := range lines1 {
 		path := getPathForLine(lines1, uint(k))
 		m1[path] = append(m1[path], v)
+		for i := k + 1; i < len(lines1); i++ {
+			if getIndent(lines1[i]) > getIndent(v) || checkLineContainDash(v) && getIndent(lines1[i]) >= getIndent(v) {
+				m1[path] = append(m1[path], lines1[i])
+			} else {
+				break
+			}
+		}
 	}
 	for k, v := range lines2 {
 		path := getPathForLine(lines2, uint(k))
 		m2[path] = append(m2[path], v)
+		for i := k + 1; i < len(lines2); i++ {
+			if getIndent(lines2[i]) > getIndent(v) || checkLineContainDash(v) && getIndent(lines2[i]) >= getIndent(v) {
+				m2[path] = append(m2[path], lines2[i])
+			} else {
+				break
+			}
+		}
 	}
 	return m1, m2
 }
@@ -125,4 +145,13 @@ func readFile(filename string) []byte {
 		log.Fatal(err)
 	}
 	return f1
+}
+
+func checkLineContainDash(line string) bool {
+	if len([]byte(line)) >= 2 {
+		if []byte(line)[0] == 45 && []byte(line)[1] == 32 {
+			return true
+		}
+	}
+	return false
 }
