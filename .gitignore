@@ -1,0 +1,8 @@
+*.retry
+*.pyc
+*.jar
+tmp/*
+!tmp/.gitkeep
+.idea
+*.iml
+.DS_Store
